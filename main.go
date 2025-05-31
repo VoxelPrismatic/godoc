@@ -210,6 +210,7 @@ func fixupSyntax(out string) []string {
 	lines := []string{}
 	inBlock := false
 	inComment := "\x00"
+
 	tokens := []string{
 		"const",
 		"var",
@@ -236,7 +237,15 @@ func fixupSyntax(out string) []string {
 
 		if !inBlock && inComment == "\x00" && slices.Index(tokens, words[0]) == -1 {
 			inComment = strings.ReplaceAll(line[:strings.Index(line, l)], "    ", "\t")
-			if inComment != "" {
+			if len(lines) > 2 && strings.HasSuffix(lines[len(lines)-2], "*/") {
+				st := lines[len(lines)-2]
+				lines[len(lines)-2] = st[:len(st)-2]
+				if strings.TrimSpace(lines[len(lines)-2]) == "" {
+					lines = slices.Concat(lines[:len(lines)-2], lines[len(lines)-1:])
+				}
+				inComment = st[:strings.Index(st, "*")-1]
+				lines[len(lines)-1] = inComment + " *"
+			} else if inComment != "" {
 				lines = append(lines, inComment+"/* "+l)
 				continue
 			} else {
@@ -245,7 +254,8 @@ func fixupSyntax(out string) []string {
 		}
 
 		if inComment != "\x00" {
-			lines = append(lines, inComment+" * "+l)
+			indentSz := strings.Count(inComment, " ") + strings.Count(inComment, "\t")*4
+			lines = append(lines, inComment+" * "+line[indentSz:])
 			continue
 		}
 
